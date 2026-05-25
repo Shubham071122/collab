@@ -1,0 +1,14 @@
+# Environment
+.env
+
+# Air
+tmp/
+
+# OS
+.DS_Store
+
+# IDE
+.vscode/
+
+# Logs
+*.log
