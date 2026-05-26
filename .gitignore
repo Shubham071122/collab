@@ -3,6 +3,7 @@
 
 # Air
 tmp/
+bin/
 
 # OS
 .DS_Store
@@ -12,3 +13,5 @@ tmp/
 
 # Logs
 *.log
+
+.gocache/

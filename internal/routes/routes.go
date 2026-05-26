@@ -1,31 +1,59 @@
 package routes
 
 import (
+	"database/sql"
+
 	"github.com/gin-gonic/gin"
-	
+
+	"github.com/shubham071122/collab/internal/middleware"
+	"github.com/shubham071122/collab/internal/response"
+
 	"github.com/shubham071122/collab/internal/auth"
+	"github.com/shubham071122/collab/internal/project"
+	"github.com/shubham071122/collab/internal/user"
 )
 
-func RegisterRoutes(router *gin.Engine) {
+func RegisterRoutes(router *gin.Engine, db *sql.DB) {
 
-	authHandler := auth.NewHandler()
+	authRepo := auth.NewRepository(db)
+	userRepo := user.NewRepository(db)
+	projectRepo := project.NewRepository(db)
 
-	api := router.Group("/api")
+	authService := auth.NewService(authRepo)
+	userService := user.NewService(userRepo)
+	projectService := project.NewService(projectRepo)
+
+	authHandler := auth.NewHandler(authService)
+	userHandler := user.NewHandler(userService)
+	projectHandler := project.NewHandler(projectService)
+
+	router.GET("/health", healthCheck)
+	api := router.Group("/api/v1")
 	{
-		api.GET("/health", healthCheck)
-
 		authRoutes := api.Group("/auth")
 		{
 			authRoutes.POST("/register", authHandler.Register)
 			authRoutes.POST("/login", authHandler.Login)
-			authRoutes.GET("/user", authHandler.User)
 			authRoutes.POST("/logout", authHandler.Logout)
+		}
+
+		userRoutes := api.Group("/user")
+		userRoutes.Use(middleware.AuthMiddleware())
+		{
+			userRoutes.GET("/:id", userHandler.CurrentUser)
+		}
+
+		projectRoutes := api.Group("/project")
+		projectRoutes.Use(middleware.AuthMiddleware())
+		{
+			projectRoutes.GET("/:id", projectHandler.GetProject)
+			projectRoutes.POST("/", projectHandler.CreateProject)
+			projectRoutes.PATCH("/:id", projectHandler.UpdateProject)
+			projectRoutes.DELETE("/:id", projectHandler.DeleteProject)
 		}
 	}
 }
 
 func healthCheck(c *gin.Context) {
-	c.JSON(200, gin.H{
-		"message": "server running smoothly",
-	})
+	response.JSON(c, response.StatusOK, "API is healthy", nil, nil)
 }

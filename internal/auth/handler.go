@@ -1,33 +1,58 @@
 package auth
 
-import "github.com/gin-gonic/gin"
+import (
+	"github.com/gin-gonic/gin"
+	"github.com/shubham071122/collab/internal/response"
+)
 
-type Handler struct{}
+type Handler struct {
+	authService *Service
+}
 
-func NewHandler() *Handler {
-	return &Handler{}
+func NewHandler(authService *Service) *Handler {
+	return &Handler{
+		authService: authService,
+	}
 }
 
 func (h *Handler) Register(c *gin.Context) {
-	c.JSON(200, gin.H{
-		"message": "register route",
-	})
+	var req RegisterRequest
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.JSON(c, response.StatusBadRequest, "", nil, err.Error())
+		return
+	}
+
+	if err := h.authService.Register(req); err != nil {
+		response.JSON(c, response.StatusInternalServerError, "", nil, err.Error())
+		return
+	}
+
+	response.JSON(c, response.StatusOK, "User registered successful", nil, nil)
 }
 
 func (h *Handler) Login(c *gin.Context) {
-	c.JSON(200, gin.H{
-		"message": "login route",
-	})
-}
+	var req LoginRequest
 
-func (h *Handler) User(c *gin.Context) {
-	c.JSON(200, gin.H{
-		"message": "current user",
-	})
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.JSON(c, response.StatusBadRequest, "", nil, err.Error())
+		return
+	}
+
+	resp, err := h.authService.Login(req)
+	if err != nil {
+		response.JSON(c, response.StatusUnauthorized, "", nil, err.Error())
+		return
+	}
+
+	response.JSON(c, response.StatusOK, "Login successful", resp, nil)
 }
 
 func (h *Handler) Logout(c *gin.Context) {
-	c.JSON(200, gin.H{
-		"message": "logout route",
-	})
+	if err := h.authService.Logout(); err != nil {
+		response.JSON(c, response.StatusInternalServerError, "", nil, err.Error())
+		return
+	}
+
+	response.JSON(c, response.StatusOK, "Logout successful", nil, nil)
 }
