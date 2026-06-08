@@ -21,7 +21,7 @@ func RegisterRoutes(router *gin.Engine, db *sql.DB) {
 
 	authService := auth.NewService(authRepo)
 	userService := user.NewService(userRepo)
-	projectService := project.NewService(projectRepo)
+	projectService := project.NewService(projectRepo, userRepo)
 
 	authHandler := auth.NewHandler(authService)
 	userHandler := user.NewHandler(userService)
@@ -30,6 +30,7 @@ func RegisterRoutes(router *gin.Engine, db *sql.DB) {
 	router.GET("/health", healthCheck)
 	api := router.Group("/api/v1")
 	{
+		// AUTH ROUTES
 		authRoutes := api.Group("/auth")
 		{
 			authRoutes.POST("/register", authHandler.Register)
@@ -37,12 +38,14 @@ func RegisterRoutes(router *gin.Engine, db *sql.DB) {
 			authRoutes.POST("/logout", authHandler.Logout)
 		}
 
+		// USER ROUTES
 		userRoutes := api.Group("/user")
 		userRoutes.Use(middleware.AuthMiddleware())
 		{
 			userRoutes.GET("/:id", userHandler.CurrentUser)
 		}
 
+		// PROJECT ROUTES
 		projectRoutes := api.Group("/project")
 		projectRoutes.Use(middleware.AuthMiddleware())
 		{
@@ -50,6 +53,11 @@ func RegisterRoutes(router *gin.Engine, db *sql.DB) {
 			projectRoutes.POST("/", projectHandler.CreateProject)
 			projectRoutes.PATCH("/:id", projectHandler.UpdateProject)
 			projectRoutes.DELETE("/:id", projectHandler.DeleteProject)
+
+			projectRoutes.POST("/:id/share", projectHandler.ShareProject)
+			projectRoutes.GET("/:id/collaborators", projectHandler.GetCollaborators)
+			projectRoutes.PATCH("/:id/collaborators/:userId", projectHandler.UpdateCollaboratorPermission)
+			projectRoutes.DELETE("/:id/collaborators/:userId", projectHandler.RemoveCollaborator)
 		}
 	}
 }
