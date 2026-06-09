@@ -17,9 +17,10 @@ func NewHandler(projectService *Service) *Handler {
 
 func (h *Handler) GetProject(c *gin.Context) {
 	projectID := c.Param("id")
-	project, err := h.projectService.GetProjectByID(projectID)
+	userID := c.GetString("user_id")
+	project, err := h.projectService.GetProjectByID(projectID, userID)
 	if err != nil {
-		response.JSON(c, response.StatusNotFound, "Project not found", nil, nil)
+		response.JSON(c, response.StatusNotFound, "Project not found or access denied", nil, err.Error())
 		return
 	}
 	response.JSON(c, response.StatusOK, "Success", project, nil)
@@ -99,6 +100,17 @@ func (h *Handler) GetCollaborators(c *gin.Context) {
 		return
 	}
 	response.JSON(c, response.StatusOK, "Success", collaborators, nil)
+}
+
+func (h *Handler) GetProjectMembers(c *gin.Context) {
+	projectID := c.Param("id")
+	userID := c.GetString("user_id")
+	members, err := h.projectService.GetProjectMembers(projectID, userID)
+	if err != nil {
+		response.JSON(c, response.StatusForbidden, "Access denied", nil, err.Error())
+		return
+	}
+	response.JSON(c, response.StatusOK, "Success", members, nil)
 }
 
 func (h *Handler) UpdateCollaboratorPermission(c *gin.Context) {

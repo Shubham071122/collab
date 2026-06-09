@@ -18,6 +18,21 @@ func AuthMiddleware() gin.HandlerFunc {
 
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
+			protocol := c.GetHeader("Sec-WebSocket-Protocol")
+			if protocol != "" {
+				parts := strings.Split(protocol, ",")
+				for _, part := range parts {
+					trimmed := strings.TrimSpace(part)
+					if trimmed != "" && trimmed != "Bearer" {
+						authHeader = "Bearer " + trimmed
+						c.Header("Sec-WebSocket-Protocol", trimmed)
+						break
+					}
+				}
+			}
+		}
+
+		if authHeader == "" {
 			response.JSON(c, response.StatusUnauthorized, "Authorization header missing", nil, nil)
 			c.Abort()
 			return

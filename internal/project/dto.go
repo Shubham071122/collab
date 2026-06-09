@@ -7,9 +7,9 @@ type CreateProjectRequest struct {
 }
 
 type UpdateProjectRequest struct {
-	Name        string `json:"name"`
-	Description string `json:"description"`
-	Canvas      string `json:"canvas"`
+	Name        *string `json:"name"`
+	Description *string `json:"description"`
+	Canvas      *string `json:"canvas"`
 }
 
 type ShareProjectRequest struct {

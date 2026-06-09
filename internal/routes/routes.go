@@ -9,11 +9,12 @@ import (
 	"github.com/shubham071122/collab/internal/response"
 
 	"github.com/shubham071122/collab/internal/auth"
+	"github.com/shubham071122/collab/internal/collaboration"
 	"github.com/shubham071122/collab/internal/project"
 	"github.com/shubham071122/collab/internal/user"
 )
 
-func RegisterRoutes(router *gin.Engine, db *sql.DB) {
+func RegisterRoutes(router *gin.Engine, db *sql.DB, hub *collaboration.Hub) {
 
 	authRepo := auth.NewRepository(db)
 	userRepo := user.NewRepository(db)
@@ -26,6 +27,8 @@ func RegisterRoutes(router *gin.Engine, db *sql.DB) {
 	authHandler := auth.NewHandler(authService)
 	userHandler := user.NewHandler(userService)
 	projectHandler := project.NewHandler(projectService)
+
+	collaborationHandler := collaboration.NewHandler(hub)
 
 	router.GET("/health", healthCheck)
 	api := router.Group("/api/v1")
@@ -56,8 +59,18 @@ func RegisterRoutes(router *gin.Engine, db *sql.DB) {
 
 			projectRoutes.POST("/:id/share", projectHandler.ShareProject)
 			projectRoutes.GET("/:id/collaborators", projectHandler.GetCollaborators)
+			projectRoutes.GET("/:id/members", projectHandler.GetProjectMembers)
 			projectRoutes.PATCH("/:id/collaborators/:userId", projectHandler.UpdateCollaboratorPermission)
 			projectRoutes.DELETE("/:id/collaborators/:userId", projectHandler.RemoveCollaborator)
+		}
+
+		collaborationRoutes := api.Group("/collaboration")
+		collaborationRoutes.Use(middleware.AuthMiddleware())
+		{
+			collaborationRoutes.GET(
+				"/project/:id",
+				collaborationHandler.Connect,
+			)
 		}
 	}
 }

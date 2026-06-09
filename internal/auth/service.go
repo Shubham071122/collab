@@ -3,6 +3,7 @@ package auth
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	"golang.org/x/crypto/bcrypt"
 	"github.com/shubham071122/collab/internal/user"
@@ -25,6 +26,12 @@ func (s *Service) Register(req RegisterRequest) error {
 		return errors.New("All fields are required!")
 	}
 
+	email := strings.ToLower(strings.TrimSpace(req.Email))
+
+	if _, err := s.authRepo.GetUserByEmail(email); err == nil {
+		return errors.New("User already exists!")
+	}
+
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
 		return err
@@ -32,7 +39,7 @@ func (s *Service) Register(req RegisterRequest) error {
 
 	err = s.authRepo.CreateUser(
 		req.Name,
-		req.Email,
+		email,
 		string(hashedPassword),
 	)
 	if err != nil {
@@ -49,7 +56,9 @@ func (s *Service) Login(req LoginRequest) (*AuthResponse, error) {
 
 	fmt.Printf("Attempting to find user with email: %s\n", req.Email)
 
-	foundUser, err := s.authRepo.GetUserByEmail(req.Email)
+	email := strings.ToLower(strings.TrimSpace(req.Email))
+
+	foundUser, err := s.authRepo.GetUserByEmail(email)
 	if err != nil {
 		fmt.Printf("Error finding user: %v\n", err)
 		return nil, errors.New("Invalid credentials!")

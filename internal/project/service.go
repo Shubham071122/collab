@@ -18,12 +18,37 @@ func NewService(projectRepo *Repository, userRepo *user.Repository) *Service {
 	}
 }
 
-func (s *Service) GetProjectByID(projectID string) (*Project, error) {
+func (s *Service) GetProjectByID(projectID string, userID string) (*Project, error) {
+	if projectID == "" {
+		return nil, errors.New("Project ID is required")
+	}
+
+	if userID == "" {
+		return nil, errors.New("User ID is required")
+	}
+
 	project, err := s.projectRepo.GetProjectByID(projectID)
 	if err != nil {
 		return nil, errors.New("Project not found")
 	}
-	return project, nil
+
+	isOwner, err := s.projectRepo.IsProjectOwner(project.ID, userID)
+	if err != nil {
+		return nil, errors.New("Failed to check project ownership")
+	}
+	if isOwner {
+		return project, nil
+	}
+
+	isCollab, err := s.projectRepo.IsProjectCollaborator(project.ID, userID)
+	if err != nil {
+		return nil, errors.New("Failed to check project collaborator")
+	}
+	if isCollab {
+		return project, nil
+	}
+
+	return nil, errors.New("Unauthorized: access denied")
 }
 
 func (s *Service) CreateProject(req CreateProjectRequest) (*Project, error) {
@@ -58,18 +83,39 @@ func (s *Service) UpdateProject(projectID string, userID string, req UpdateProje
 		return nil, errors.New("Project not found")
 	}
 
-	// isOwner, err := s.projectRepo.IsProjectOwner(existingProject.ID, userID)
-	// if err != nil {
-	// 	return nil, errors.New("Failed to check project ownership")
-	// }
+	isOwner, err := s.projectRepo.IsProjectOwner(existingProject.ID, userID)
+	if err != nil {
+		return nil, errors.New("Failed to check project ownership")
+	}
+	if !isOwner {
+		isCollab, err := s.projectRepo.IsProjectCollaborator(existingProject.ID, userID)
+		if err != nil {
+			return nil, errors.New("Failed to check collaborator status")
+		}
+		if !isCollab {
+			return nil, errors.New("Unauthorized: only owner or collaborators with edit permission can update")
+		}
 
-	// if !isOwner {
-	// 	return nil, errors.New("Unauthorized: only project owner can update")
-	// }
+		permission, err := s.projectRepo.GetCollaboratorPermission(existingProject.ID, userID)
+		if err != nil {
+			return nil, errors.New("Failed to get collaborator permission")
+		}
 
-	existingProject.Name = req.Name
-	existingProject.Description = req.Description
-	existingProject.Canvas = req.Canvas
+		if permission != "edit" {
+			return nil, errors.New("Unauthorized: insufficient permission to update project")
+		}
+	}
+
+	if req.Name != nil {
+		existingProject.Name = *req.Name
+	}
+	if req.Description != nil {
+		existingProject.Description = *req.Description
+	}
+	if req.Canvas != nil {
+		existingProject.Canvas = *req.Canvas
+	}
+
 	updatedProject, err := s.projectRepo.UpdateProject(existingProject)
 	if err != nil {
 		return nil, errors.New("Failed to update project")
@@ -165,6 +211,16 @@ func (s *Service) GetCollaborators(projectID string, userID string) ([]Collabora
 	}
 
 	return s.projectRepo.GetCollaborators(existingProject.ID)
+}
+
+func (s *Service) GetProjectMembers(projectID string, userID string) (*MemberInfo, error) {
+	if projectID == "" {
+		return nil, errors.New("Project ID is required")
+	}
+	if userID == "" {
+		return nil, errors.New("User ID is required")
+	}
+	return s.projectRepo.GetProjectMembers(projectID, userID)
 }
 
 func (s *Service) UpdateCollaboratorPermission(projectID string, userID string, ownerID string, permission string) error {

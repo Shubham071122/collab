@@ -30,7 +30,7 @@ func (r *Repository) CreateUser(
 			email,
 			password_hash
 		)
-		VALUES ($1, $2, $3, $4)
+		VALUES ($1, $2, lower($3), $4)
 	`
 
 	_, err := r.db.Exec(
@@ -55,7 +55,7 @@ func (r *Repository) GetUserByEmail(email string) (*user.User, error) {
 			created_at,
 			updated_at
 		FROM users
-		WHERE email = $1
+		WHERE lower(email) = lower($1)
 	`
 
 	var u user.User
