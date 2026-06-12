@@ -3,18 +3,21 @@ package project
 import (
 	"errors"
 
+	"github.com/shubham071122/collab/internal/collaboration"
 	"github.com/shubham071122/collab/internal/user"
 )
 
 type Service struct {
 	projectRepo *Repository
 	userRepo    *user.Repository
+	hub         *collaboration.Hub
 }
 
-func NewService(projectRepo *Repository, userRepo *user.Repository) *Service {
+func NewService(projectRepo *Repository, userRepo *user.Repository, hub *collaboration.Hub) *Service {
 	return &Service{
 		projectRepo: projectRepo,
 		userRepo:    userRepo,
+		hub:         hub,
 	}
 }
 
@@ -251,7 +254,13 @@ func (s *Service) UpdateCollaboratorPermission(projectID string, userID string, 
 		return errors.New("Unauthorized: only project owner can update collaborator permission")
 	}
 
-	return s.projectRepo.UpdateCollaboratorPermission(existingProject.ID, userID, permission)
+	err = s.projectRepo.UpdateCollaboratorPermission(existingProject.ID, userID, permission)
+	if err != nil {
+		return err
+	}
+
+	s.hub.UpdateUserPermission(existingProject.ID, userID, permission)
+	return nil
 }
 
 func (s *Service) RemoveCollaborator(projectID string, userID string, ownerID string) error {
@@ -278,5 +287,11 @@ func (s *Service) RemoveCollaborator(projectID string, userID string, ownerID st
 		return errors.New("Unauthorized: only project owner can remove collaborators")
 	}
 
-	return s.projectRepo.RemoveCollaborator(existingProject.ID, userID)
+	err = s.projectRepo.RemoveCollaborator(existingProject.ID, userID)
+	if err != nil {
+		return err
+	}
+
+	s.hub.UpdateUserPermission(existingProject.ID, userID, "")
+	return nil
 }

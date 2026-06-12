@@ -18,6 +18,17 @@ func AuthMiddleware() gin.HandlerFunc {
 
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
+			tokenQuery := c.Query("token")
+			if tokenQuery != "" {
+				authHeader = "Bearer " + tokenQuery
+			}
+		}
+		if authHeader == "" {
+			if cookieToken, err := c.Cookie("auth_token"); err == nil && cookieToken != "" {
+				authHeader = "Bearer " + cookieToken
+			}
+		}
+		if authHeader == "" {
 			protocol := c.GetHeader("Sec-WebSocket-Protocol")
 			if protocol != "" {
 				parts := strings.Split(protocol, ",")

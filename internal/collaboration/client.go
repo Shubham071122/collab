@@ -21,13 +21,15 @@ func (c *Client) readPump() {
 	}()
 
 	for {
-
 		var message Message
 
 		err := c.Conn.ReadJSON(&message)
-
 		if err != nil {
 			break
+		}
+
+		if message.Type == "canvas_change" && c.Permission == "read" {
+			continue
 		}
 
 		message.ProjectID = c.ProjectID
@@ -42,16 +44,12 @@ func (c *Client) writePump() {
 	defer c.Conn.Close()
 
 	for {
-
 		message, ok := <-c.Send
-
 		if !ok {
-
 			c.Conn.WriteMessage(
 				websocket.CloseMessage,
 				[]byte{},
 			)
-
 			return
 		}
 
@@ -59,7 +57,6 @@ func (c *Client) writePump() {
 			websocket.TextMessage,
 			message,
 		)
-
 		if err != nil {
 			return
 		}

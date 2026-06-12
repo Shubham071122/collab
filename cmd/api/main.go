@@ -17,8 +17,8 @@ func main() {
 
 	db := database.ConnectPostgres(cfg)
 
-	hub := collaboration.NewHub()
-
+	hub := collaboration.NewHub(db)
+	go hub.Run()
 
 	router := gin.Default()
 
