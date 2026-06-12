@@ -2,7 +2,6 @@ package config
 
 import (
 	"os"
-	"log"
 
 	"github.com/joho/godotenv"
 )
@@ -13,15 +12,12 @@ type Config struct {
 	DatabaseURL     string
 	ResendAPIKey    string
 	ResendFromEmail string
+	AllowedOrigin   string
 }
 
 func LoadConfig() *Config {
 
-	err := godotenv.Load()
-
-	if err != nil {
-		log.Fatalf("Error loading .env file: %v", err)
-	}
+	_ = godotenv.Load()
 
 	return &Config{
 		Port:            os.Getenv("PORT"),
@@ -29,5 +25,6 @@ func LoadConfig() *Config {
 		DatabaseURL:     os.Getenv("DATABASE_URL"),
 		ResendAPIKey:    os.Getenv("RESEND_API_KEY"),
 		ResendFromEmail: os.Getenv("RESEND_FROM_EMAIL"),
+		AllowedOrigin:   os.Getenv("ALLOWED_ORIGIN"),
 	}
 }

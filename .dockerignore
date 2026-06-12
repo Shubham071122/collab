@@ -1,0 +1,28 @@
+# Version control
+.git
+.gitignore
+
+# Go Build & Tooling Caches
+.gocache
+tmp/
+bin/
+main
+
+# Development configs & Secrets
+.env
+.env.local
+.env.development
+.env.production
+.env.*
+.air.toml
+
+# Docker configs
+Dockerfile
+.dockerignore
+
+# Documentation and scripts
+README.md
+scripts/
+deployments/
+*.log
+*.pdf

@@ -7,6 +7,7 @@ import (
 
 	"github.com/shubham071122/collab/internal/config"
 	"github.com/shubham071122/collab/internal/database"
+	"github.com/shubham071122/collab/internal/middleware"
 	"github.com/shubham071122/collab/internal/routes"
 	"github.com/shubham071122/collab/internal/collaboration"
 )
@@ -21,6 +22,12 @@ func main() {
 	go hub.Run()
 
 	router := gin.Default()
+
+	allowedOrigin := cfg.AllowedOrigin
+	if allowedOrigin == "" {
+		allowedOrigin = "http://localhost:3000"
+	}
+	router.Use(middleware.CORSMiddleware(allowedOrigin))
 
 	routes.RegisterRoutes(router, db, hub)
 
