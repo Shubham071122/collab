@@ -54,6 +54,7 @@ func RegisterRoutes(router *gin.Engine, db *sql.DB, hub *collaboration.Hub) {
 		projectRoutes := api.Group("/project")
 		projectRoutes.Use(middleware.AuthMiddleware())
 		{
+			projectRoutes.GET("/", projectHandler.GetProjects)
 			projectRoutes.GET("/:id", projectHandler.GetProject)
 			projectRoutes.POST("/", projectHandler.CreateProject)
 			projectRoutes.PATCH("/:id", projectHandler.UpdateProject)

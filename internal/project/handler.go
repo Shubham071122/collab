@@ -144,3 +144,13 @@ func (h *Handler) RemoveCollaborator(c *gin.Context) {
 
 	response.JSON(c, response.StatusOK, "Collaborator removed successfully", nil, nil)
 }
+
+func (h *Handler) GetProjects(c *gin.Context) {
+	userID := c.GetString("user_id")
+	projects, err := h.projectService.GetProjects(userID)
+	if err != nil {
+		response.JSON(c, response.StatusInternalServerError, "Failed to retrieve projects", nil, err.Error())
+		return
+	}
+	response.JSON(c, response.StatusOK, "Success", projects, nil)
+}

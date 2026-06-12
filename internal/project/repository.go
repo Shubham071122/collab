@@ -278,3 +278,51 @@ func (r *Repository) GetCollaboratorPermission(projectID string, userID string) 
 	}
 	return permission, nil
 }
+
+func (r *Repository) GetProjectsByUserID(userID string) ([]Project, error) {
+	var projects []Project
+
+	query := `
+		SELECT DISTINCT p.id, p.name, p.description, p.user_id, p.canvas, p.created_at, p.updated_at
+		FROM projects p
+		LEFT JOIN project_collaborators pc ON p.id = pc.project_id
+		WHERE p.user_id = $1 OR pc.user_id = $1
+		ORDER BY p.updated_at DESC
+	`
+
+	rows, err := r.db.Query(query, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var project Project
+		var description, ownerID sql.NullString
+		err := rows.Scan(
+			&project.ID,
+			&project.Name,
+			&description,
+			&ownerID,
+			&project.Canvas,
+			&project.CreatedAt,
+			&project.UpdatedAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+		if description.Valid {
+			project.Description = description.String
+		}
+		if ownerID.Valid {
+			project.OwnerID = ownerID.String
+		}
+		projects = append(projects, project)
+	}
+
+	if projects == nil {
+		projects = []Project{}
+	}
+
+	return projects, nil
+}

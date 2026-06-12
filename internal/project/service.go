@@ -295,3 +295,10 @@ func (s *Service) RemoveCollaborator(projectID string, userID string, ownerID st
 	s.hub.UpdateUserPermission(existingProject.ID, userID, "")
 	return nil
 }
+
+func (s *Service) GetProjects(userID string) ([]Project, error) {
+	if userID == "" {
+		return nil, errors.New("User ID is required")
+	}
+	return s.projectRepo.GetProjectsByUserID(userID)
+}
