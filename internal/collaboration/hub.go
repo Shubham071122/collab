@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"log"
 	"time"
+
+	"github.com/gorilla/websocket"
 )
 
 type CanvasSnapshot struct {
@@ -128,7 +130,10 @@ func (h *Hub) Run() {
 								UserID:    task.UserID,
 							}
 							client.Send <- mustMarshal(msg)
-							client.Conn.Close()
+							go func(conn *websocket.Conn) {
+								time.Sleep(150 * time.Millisecond)
+								conn.Close()
+							}(client.Conn)
 						} else {
 							// Permission updated!
 							client.Permission = task.Permission
@@ -208,6 +213,14 @@ func (h *Hub) saveCanvasToDB(projectId string, snapshot *CanvasSnapshot) {
 		log.Printf("Error auto-saving canvas to database for project %s: %v", projectId, err)
 	} else {
 		log.Printf("Successfully auto-saved canvas to database for project %s", projectId)
+		select {
+		case h.broadcast <- Message{
+			Type:      "canvas_saved",
+			ProjectID: projectId,
+		}:
+		case <-time.After(1 * time.Second):
+			log.Printf("Timeout broadcasting canvas_saved for project %s", projectId)
+		}
 	}
 }
 

@@ -2,6 +2,7 @@ package auth
 
 import (
 	"database/sql"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/shubham071122/collab/internal/user"
@@ -21,6 +22,8 @@ func (r *Repository) CreateUser(
 	name string,
 	email string,
 	passwordHash string,
+	verificationCode string,
+	verificationExpires time.Time,
 ) error {
 
 	query := `
@@ -28,9 +31,12 @@ func (r *Repository) CreateUser(
 			id,
 			name,
 			email,
-			password_hash
+			password_hash,
+			is_verified,
+			verification_code,
+			verification_expires
 		)
-		VALUES ($1, $2, lower($3), $4)
+		VALUES ($1, $2, lower($3), $4, FALSE, $5, $6)
 	`
 
 	_, err := r.db.Exec(
@@ -39,6 +45,8 @@ func (r *Repository) CreateUser(
 		name,
 		email,
 		passwordHash,
+		verificationCode,
+		verificationExpires,
 	)
 
 	return err
@@ -52,6 +60,9 @@ func (r *Repository) GetUserByEmail(email string) (*user.User, error) {
 			name,
 			email,
 			password_hash,
+			is_verified,
+			verification_code,
+			verification_expires,
 			created_at,
 			updated_at
 		FROM users
@@ -65,6 +76,9 @@ func (r *Repository) GetUserByEmail(email string) (*user.User, error) {
 		&u.Name,
 		&u.Email,
 		&u.PasswordHash,
+		&u.IsVerified,
+		&u.VerificationCode,
+		&u.VerificationExpires,
 		&u.CreatedAt,
 		&u.UpdatedAt,
 	)
@@ -74,4 +88,24 @@ func (r *Repository) GetUserByEmail(email string) (*user.User, error) {
 	}
 
 	return &u, nil
+}
+
+func (r *Repository) UpdateVerificationCode(userID string, code string, expires time.Time) error {
+	query := `
+		UPDATE users
+		SET verification_code = $1, verification_expires = $2, updated_at = NOW()
+		WHERE id = $3
+	`
+	_, err := r.db.Exec(query, code, expires, userID)
+	return err
+}
+
+func (r *Repository) VerifyUser(userID string) error {
+	query := `
+		UPDATE users
+		SET is_verified = TRUE, verification_code = NULL, verification_expires = NULL, updated_at = NOW()
+		WHERE id = $1
+	`
+	_, err := r.db.Exec(query, userID)
+	return err
 }

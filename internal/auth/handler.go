@@ -56,3 +56,36 @@ func (h *Handler) Logout(c *gin.Context) {
 
 	response.JSON(c, response.StatusOK, "Logout successful", nil, nil)
 }
+
+func (h *Handler) VerifyOTP(c *gin.Context) {
+	var req VerifyOTPRequest
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.JSON(c, response.StatusBadRequest, "", nil, err.Error())
+		return
+	}
+
+	resp, err := h.authService.VerifyOTP(req)
+	if err != nil {
+		response.JSON(c, response.StatusBadRequest, "", nil, err.Error())
+		return
+	}
+
+	response.JSON(c, response.StatusOK, "Verification successful", resp, nil)
+}
+
+func (h *Handler) ResendOTP(c *gin.Context) {
+	var req ResendOTPRequest
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.JSON(c, response.StatusBadRequest, "", nil, err.Error())
+		return
+	}
+
+	if err := h.authService.ResendOTP(req); err != nil {
+		response.JSON(c, response.StatusBadRequest, "", nil, err.Error())
+		return
+	}
+
+	response.JSON(c, response.StatusOK, "Verification code resent successfully", nil, nil)
+}

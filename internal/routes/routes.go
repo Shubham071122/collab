@@ -39,6 +39,8 @@ func RegisterRoutes(router *gin.Engine, db *sql.DB, hub *collaboration.Hub) {
 			authRoutes.POST("/register", authHandler.Register)
 			authRoutes.POST("/login", authHandler.Login)
 			authRoutes.POST("/logout", authHandler.Logout)
+			authRoutes.POST("/verify-otp", authHandler.VerifyOTP)
+			authRoutes.POST("/resend-otp", authHandler.ResendOTP)
 		}
 
 		// USER ROUTES

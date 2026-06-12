@@ -14,6 +14,16 @@ type LoginRequest struct {
 }
 
 type AuthResponse struct {
-	Token string `json:"token"`
+	Token string       `json:"token"`
 	User  user.UserDTO `json:"user"`
 }
+
+type VerifyOTPRequest struct {
+	Email string `json:"email"`
+	Code  string `json:"code"`
+}
+
+type ResendOTPRequest struct {
+	Email string `json:"email"`
+}
+

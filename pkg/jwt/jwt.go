@@ -7,13 +7,14 @@ import (
 	"github.com/shubham071122/collab/internal/config"
 )
 
-func GenerateJWT(userID string) (string, error) {
+func GenerateJWT(userID string, isVerified bool) (string, error) {
 
 	jwtSecret := config.LoadConfig().JWTSecret
 
 	claims := jwt.MapClaims{
-		"user_id": userID,
-		"exp":     time.Now().Add(time.Hour * 24).Unix(),
+		"user_id":     userID,
+		"is_verified": isVerified,
+		"exp":         time.Now().Add(time.Hour * 24).Unix(),
 	}
 
 	token := jwt.NewWithClaims(
