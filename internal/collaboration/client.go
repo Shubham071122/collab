@@ -32,6 +32,10 @@ func (c *Client) readPump() {
 			continue
 		}
 
+		if message.Type == "ping" {
+			continue
+		}
+
 		message.ProjectID = c.ProjectID
 		message.UserID = c.UserID
 
