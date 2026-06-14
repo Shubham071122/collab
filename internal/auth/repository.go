@@ -24,7 +24,7 @@ func (r *Repository) CreateUser(
 	passwordHash string,
 	verificationCode string,
 	verificationExpires time.Time,
-) error {
+) (string, error) {
 
 	query := `
 		INSERT INTO users (
@@ -39,9 +39,10 @@ func (r *Repository) CreateUser(
 		VALUES ($1, $2, lower($3), $4, FALSE, $5, $6)
 	`
 
+	userID := uuid.New().String()
 	_, err := r.db.Exec(
 		query,
-		uuid.New().String(),
+		userID,
 		name,
 		email,
 		passwordHash,
@@ -49,7 +50,11 @@ func (r *Repository) CreateUser(
 		verificationExpires,
 	)
 
-	return err
+	if err != nil {
+		return "", err
+	}
+
+	return userID, nil
 }
 
 func (r *Repository) GetUserByEmail(email string) (*user.User, error) {

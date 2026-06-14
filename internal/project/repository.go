@@ -21,9 +21,30 @@ func (r *Repository) GetProjectByID(id string) (*Project, error) {
 	var project Project
 
 	query := `
-		SELECT id, user_id, name, description, canvas, created_at, updated_at
-		FROM projects
-		WHERE id = $1
+		SELECT 
+			p.id, 
+			p.user_id, 
+			p.name, 
+			p.description, 
+			p.canvas, 
+			p.created_at, 
+			p.updated_at,
+			COALESCE(
+				(
+					SELECT 
+						(SELECT COUNT(*) FROM projects p2 WHERE p2.user_id = p.user_id) > 
+						CASE 
+							WHEN us.tier = 'gold' THEN 9999999
+							WHEN us.tier = 'silver' THEN 5
+							ELSE 2
+						END
+					FROM user_subscriptions us 
+					WHERE us.user_id = p.user_id
+				), 
+				FALSE
+			) AS is_locked
+		FROM projects p
+		WHERE p.id = $1
 	`
 
 	err := r.db.QueryRow(query, id).Scan(
@@ -34,6 +55,7 @@ func (r *Repository) GetProjectByID(id string) (*Project, error) {
 		&project.Canvas,
 		&project.CreatedAt,
 		&project.UpdatedAt,
+		&project.IsLocked,
 	)
 
 	if err != nil {
@@ -279,11 +301,42 @@ func (r *Repository) GetCollaboratorPermission(projectID string, userID string) 
 	return permission, nil
 }
 
+func (r *Repository) GetOwnedProjectsCount(userID string) (int, error) {
+	var count int
+	query := `SELECT COUNT(*) FROM projects WHERE user_id = $1`
+	err := r.db.QueryRow(query, userID).Scan(&count)
+	if err != nil {
+		return 0, err
+	}
+	return count, nil
+}
+
 func (r *Repository) GetProjectsByUserID(userID string) ([]Project, error) {
 	var projects []Project
 
 	query := `
-		SELECT DISTINCT p.id, p.name, p.description, p.user_id, p.canvas, p.created_at, p.updated_at
+		SELECT DISTINCT 
+			p.id, 
+			p.name, 
+			p.description, 
+			p.user_id, 
+			p.canvas, 
+			p.created_at, 
+			p.updated_at,
+			COALESCE(
+				(
+					SELECT 
+						(SELECT COUNT(*) FROM projects p2 WHERE p2.user_id = p.user_id) > 
+						CASE 
+							WHEN us.tier = 'gold' THEN 9999999
+							WHEN us.tier = 'silver' THEN 5
+							ELSE 2
+						END
+					FROM user_subscriptions us 
+					WHERE us.user_id = p.user_id
+				), 
+				FALSE
+			) AS is_locked
 		FROM projects p
 		LEFT JOIN project_collaborators pc ON p.id = pc.project_id
 		WHERE p.user_id = $1 OR pc.user_id = $1
@@ -307,6 +360,7 @@ func (r *Repository) GetProjectsByUserID(userID string) ([]Project, error) {
 			&project.Canvas,
 			&project.CreatedAt,
 			&project.UpdatedAt,
+			&project.IsLocked,
 		)
 		if err != nil {
 			return nil, err

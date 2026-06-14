@@ -11,6 +11,7 @@ import (
 	"github.com/shubham071122/collab/internal/auth"
 	"github.com/shubham071122/collab/internal/collaboration"
 	"github.com/shubham071122/collab/internal/project"
+	"github.com/shubham071122/collab/internal/subscription"
 	"github.com/shubham071122/collab/internal/user"
 )
 
@@ -19,20 +20,26 @@ func RegisterRoutes(router *gin.Engine, db *sql.DB, hub *collaboration.Hub) {
 	authRepo := auth.NewRepository(db)
 	userRepo := user.NewRepository(db)
 	projectRepo := project.NewRepository(db)
+	subscriptionRepo := subscription.NewRepository(db)
 
-	authService := auth.NewService(authRepo)
+	authService := auth.NewService(authRepo, subscriptionRepo)
 	userService := user.NewService(userRepo)
-	projectService := project.NewService(projectRepo, userRepo, hub)
+	subscriptionService := subscription.NewService(subscriptionRepo)
+	projectService := project.NewService(projectRepo, userRepo, hub, subscriptionService)
 
 	authHandler := auth.NewHandler(authService)
 	userHandler := user.NewHandler(userService)
 	projectHandler := project.NewHandler(projectService)
+	subscriptionHandler := subscription.NewHandler(subscriptionService)
 
 	collaborationHandler := collaboration.NewHandler(hub)
 
 	router.GET("/health", healthCheck)
 	api := router.Group("/api/v1")
 	{
+		// PLANS ROUTE
+		api.GET("/plans", subscriptionHandler.GetPlans)
+
 		// AUTH ROUTES
 		authRoutes := api.Group("/auth")
 		{
@@ -41,6 +48,13 @@ func RegisterRoutes(router *gin.Engine, db *sql.DB, hub *collaboration.Hub) {
 			authRoutes.POST("/logout", authHandler.Logout)
 			authRoutes.POST("/verify-otp", authHandler.VerifyOTP)
 			authRoutes.POST("/resend-otp", authHandler.ResendOTP)
+		}
+
+		// SUBSCRIPTION ROUTES
+		subscriptionRoutes := api.Group("/subscription")
+		subscriptionRoutes.Use(middleware.AuthMiddleware())
+		{
+			subscriptionRoutes.GET("/", subscriptionHandler.GetSubscription)
 		}
 
 		// USER ROUTES

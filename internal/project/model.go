@@ -8,6 +8,7 @@ type Project struct {
 	Name        string    `json:"name"`
 	Description string    `json:"description"`
 	Canvas      string    `json:"canvas"`
+	IsLocked    bool      `json:"is_locked"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
 }

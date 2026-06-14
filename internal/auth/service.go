@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"golang.org/x/crypto/bcrypt"
+	"github.com/shubham071122/collab/internal/subscription"
 	"github.com/shubham071122/collab/internal/user"
 	"github.com/shubham071122/collab/pkg/email"
 	"github.com/shubham071122/collab/pkg/jwt"
@@ -15,11 +16,13 @@ import (
 
 type Service struct {
 	authRepo *Repository
+	subRepo  *subscription.Repository
 }
 
-func NewService(authRepo *Repository) *Service {
+func NewService(authRepo *Repository, subRepo *subscription.Repository) *Service {
 	return &Service{
 		authRepo: authRepo,
+		subRepo:  subRepo,
 	}
 }
 
@@ -48,13 +51,18 @@ func (s *Service) Register(req RegisterRequest) error {
 	otpCode := generateOTP()
 	otpExpires := time.Now().Add(30 * time.Minute)
 
-	err = s.authRepo.CreateUser(
+	userID, err := s.authRepo.CreateUser(
 		req.Name,
 		emailStr,
 		string(hashedPassword),
 		otpCode,
 		otpExpires,
 	)
+	if err != nil {
+		return err
+	}
+
+	err = s.subRepo.CreateDefaultSubscription(userID)
 	if err != nil {
 		return err
 	}

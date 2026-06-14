@@ -7,6 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
+	"github.com/shubham071122/collab/internal/subscription"
 )
 
 var upgrader = websocket.Upgrader{
@@ -32,20 +33,50 @@ func getProjectPermission(db *sql.DB, projectID string, userID string) (string, 
 	if err != nil {
 		return "", err
 	}
-	if ownerID == userID {
-		return "owner", nil
+
+	var ownedCount int
+	countQuery := `SELECT COUNT(*) FROM projects WHERE user_id = $1`
+	err = db.QueryRow(countQuery, ownerID).Scan(&ownedCount)
+	if err != nil {
+		return "", err
 	}
 
-	var permission string
-	collabQuery := `SELECT permission FROM project_collaborators WHERE project_id = $1 AND user_id = $2`
-	err = db.QueryRow(collabQuery, projectID, userID).Scan(&permission)
+	var tier string
+	tierQuery := `SELECT tier FROM user_subscriptions WHERE user_id = $1`
+	err = db.QueryRow(tierQuery, ownerID).Scan(&tier)
 	if err == sql.ErrNoRows {
-		return "", nil
+		tier = string(subscription.TierFree)
 	} else if err != nil {
 		return "", err
 	}
 
-	return permission, nil
+	isLocked := false
+	if plan, exists := subscription.Plans[subscription.SubscriptionTier(tier)]; exists {
+		if plan.MaxProjects != -1 && ownedCount > plan.MaxProjects {
+			isLocked = true
+		}
+	}
+
+	var userPermission string
+	if ownerID == userID {
+		userPermission = "owner"
+	} else {
+		var permission string
+		collabQuery := `SELECT permission FROM project_collaborators WHERE project_id = $1 AND user_id = $2`
+		err = db.QueryRow(collabQuery, projectID, userID).Scan(&permission)
+		if err == sql.ErrNoRows {
+			return "", nil
+		} else if err != nil {
+			return "", err
+		}
+		userPermission = permission
+	}
+
+	if isLocked && userPermission != "" {
+		return "read", nil
+	}
+
+	return userPermission, nil
 }
 
 func (h *Handler) Connect(c *gin.Context) {

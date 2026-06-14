@@ -4,6 +4,7 @@ import (
 	"errors"
 
 	"github.com/shubham071122/collab/internal/collaboration"
+	"github.com/shubham071122/collab/internal/subscription"
 	"github.com/shubham071122/collab/internal/user"
 )
 
@@ -11,13 +12,20 @@ type Service struct {
 	projectRepo *Repository
 	userRepo    *user.Repository
 	hub         *collaboration.Hub
+	subService  *subscription.Service
 }
 
-func NewService(projectRepo *Repository, userRepo *user.Repository, hub *collaboration.Hub) *Service {
+func NewService(
+	projectRepo *Repository,
+	userRepo *user.Repository,
+	hub *collaboration.Hub,
+	subService *subscription.Service,
+) *Service {
 	return &Service{
 		projectRepo: projectRepo,
 		userRepo:    userRepo,
 		hub:         hub,
+		subService:  subService,
 	}
 }
 
@@ -64,6 +72,19 @@ func (s *Service) CreateProject(req CreateProjectRequest) (*Project, error) {
 		return nil, errors.New("User ID is required")
 	}
 
+	ownedCount, err := s.projectRepo.GetOwnedProjectsCount(req.UserID)
+	if err != nil {
+		return nil, errors.New("Failed to check project limits")
+	}
+
+	canCreate, err := s.subService.CheckProjectLimit(req.UserID, ownedCount)
+	if err != nil {
+		return nil, err
+	}
+	if !canCreate {
+		return nil, subscription.ErrLimitExceeded
+	}
+
 	project, err := s.projectRepo.CreateProject(req.Name, req.Description, req.UserID)
 	if err != nil {
 		return nil, errors.New("Failed to create project")
@@ -81,9 +102,21 @@ func (s *Service) UpdateProject(projectID string, userID string, req UpdateProje
 	}
 
 	existingProject, err := s.projectRepo.GetProjectByID(projectID)
-
 	if err != nil {
 		return nil, errors.New("Project not found")
+	}
+
+	ownerOwnedCount, err := s.projectRepo.GetOwnedProjectsCount(existingProject.OwnerID)
+	if err != nil {
+		return nil, errors.New("Failed to verify project limits")
+	}
+
+	canEdit, err := s.subService.CheckProjectLimit(existingProject.OwnerID, ownerOwnedCount-1)
+	if err != nil {
+		return nil, err
+	}
+	if !canEdit {
+		return nil, subscription.ErrLimitExceeded
 	}
 
 	isOwner, err := s.projectRepo.IsProjectOwner(existingProject.ID, userID)
@@ -184,6 +217,29 @@ func (s *Service) ShareProject(projectID string, req ShareProjectRequest, ownerI
 
 	if targetUser.ID == ownerID {
 		return errors.New("Cannot share project with yourself")
+	}
+
+	collaborators, err := s.projectRepo.GetCollaborators(existingProject.ID)
+	if err != nil {
+		return errors.New("Failed to verify collaborator count")
+	}
+
+	isAlreadyCollaborator := false
+	for _, c := range collaborators {
+		if c.ID == targetUser.ID {
+			isAlreadyCollaborator = true
+			break
+		}
+	}
+
+	if !isAlreadyCollaborator {
+		canShare, err := s.subService.CheckShareLimit(ownerID, len(collaborators))
+		if err != nil {
+			return err
+		}
+		if !canShare {
+			return subscription.ErrLimitExceeded
+		}
 	}
 
 	return s.projectRepo.ShareProject(existingProject.ID, targetUser.ID, req.Permission)

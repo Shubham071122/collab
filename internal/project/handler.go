@@ -1,8 +1,11 @@
 package project
 
 import (
+	"errors"
+
 	"github.com/gin-gonic/gin"
 	"github.com/shubham071122/collab/internal/response"
+	"github.com/shubham071122/collab/internal/subscription"
 )
 
 type Handler struct {
@@ -38,6 +41,10 @@ func (h *Handler) CreateProject(c *gin.Context) {
 
 	project, err := h.projectService.CreateProject(req)
 	if err != nil {
+		if errors.Is(err, subscription.ErrLimitExceeded) {
+			response.JSON(c, response.StatusPaymentRequired, "Project limit reached. Please upgrade your plan to create more projects.", nil, err.Error())
+			return
+		}
 		response.JSON(c, response.StatusInternalServerError, "Failed to create project", nil, err.Error())
 		return
 	}
@@ -56,6 +63,10 @@ func (h *Handler) UpdateProject(c *gin.Context) {
 
 	updatedProject, err := h.projectService.UpdateProject(projectID, userID, req)
 	if err != nil {
+		if errors.Is(err, subscription.ErrLimitExceeded) {
+			response.JSON(c, response.StatusPaymentRequired, "Your account project limit has been exceeded. Please upgrade your plan to resume editing.", nil, err.Error())
+			return
+		}
 		response.JSON(c, response.StatusInternalServerError, "Failed to update project", nil, err.Error())
 		return
 	}
@@ -84,6 +95,10 @@ func (h *Handler) ShareProject(c *gin.Context) {
 
 	ownerID := c.GetString("user_id")
 	if err := h.projectService.ShareProject(projectID, req, ownerID); err != nil {
+		if errors.Is(err, subscription.ErrLimitExceeded) {
+			response.JSON(c, response.StatusPaymentRequired, "Collaborator limit reached for this project. Please upgrade your plan to share with more users.", nil, err.Error())
+			return
+		}
 		response.JSON(c, response.StatusInternalServerError, "Failed to share project", nil, err.Error())
 		return
 	}
