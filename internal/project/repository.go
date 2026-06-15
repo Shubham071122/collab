@@ -34,8 +34,8 @@ func (r *Repository) GetProjectByID(id string) (*Project, error) {
 					SELECT 
 						(SELECT COUNT(*) FROM projects p2 WHERE p2.user_id = p.user_id) > 
 						CASE 
-							WHEN us.tier = 'gold' THEN 9999999
-							WHEN us.tier = 'silver' THEN 5
+							WHEN us.status = 'active' AND us.tier = 'gold' THEN 9999999
+							WHEN us.status = 'active' AND us.tier = 'silver' THEN 5
 							ELSE 2
 						END
 					FROM user_subscriptions us 
@@ -328,8 +328,8 @@ func (r *Repository) GetProjectsByUserID(userID string) ([]Project, error) {
 					SELECT 
 						(SELECT COUNT(*) FROM projects p2 WHERE p2.user_id = p.user_id) > 
 						CASE 
-							WHEN us.tier = 'gold' THEN 9999999
-							WHEN us.tier = 'silver' THEN 5
+							WHEN us.status = 'active' AND us.tier = 'gold' THEN 9999999
+							WHEN us.status = 'active' AND us.tier = 'silver' THEN 5
 							ELSE 2
 						END
 					FROM user_subscriptions us 

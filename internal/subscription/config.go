@@ -21,7 +21,7 @@ var Plans = map[SubscriptionTier]PlanConfig{
 	TierSilver: {
 		ID:          TierSilver,
 		Name:        "Silver",
-		PriceInRs:   100.0,
+		PriceInRs:   5.0,
 		MaxProjects: 5,
 		MaxShares:   5,
 		Description: "Scale up with up to 5 projects and share with 5 collaborators.",
@@ -29,7 +29,7 @@ var Plans = map[SubscriptionTier]PlanConfig{
 	TierGold: {
 		ID:          TierGold,
 		Name:        "Gold",
-		PriceInRs:   200.0,
+		PriceInRs:   10.0,
 		MaxProjects: -1, // Unlimited
 		MaxShares:   -1, // Unlimited
 		Description: "Unlock full capability with unlimited projects and collaborators.",

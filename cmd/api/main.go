@@ -29,7 +29,7 @@ func main() {
 	}
 	router.Use(middleware.CORSMiddleware(allowedOrigin))
 
-	routes.RegisterRoutes(router, db, hub)
+	routes.RegisterRoutes(router, db, hub, cfg)
 
 	if err := router.Run(":" + cfg.Port); err != nil {
 		log.Fatal(err)

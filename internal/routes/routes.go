@@ -10,12 +10,13 @@ import (
 
 	"github.com/shubham071122/collab/internal/auth"
 	"github.com/shubham071122/collab/internal/collaboration"
+	"github.com/shubham071122/collab/internal/config"
 	"github.com/shubham071122/collab/internal/project"
 	"github.com/shubham071122/collab/internal/subscription"
 	"github.com/shubham071122/collab/internal/user"
 )
 
-func RegisterRoutes(router *gin.Engine, db *sql.DB, hub *collaboration.Hub) {
+func RegisterRoutes(router *gin.Engine, db *sql.DB, hub *collaboration.Hub, cfg *config.Config) {
 
 	authRepo := auth.NewRepository(db)
 	userRepo := user.NewRepository(db)
@@ -24,7 +25,7 @@ func RegisterRoutes(router *gin.Engine, db *sql.DB, hub *collaboration.Hub) {
 
 	authService := auth.NewService(authRepo, subscriptionRepo)
 	userService := user.NewService(userRepo)
-	subscriptionService := subscription.NewService(subscriptionRepo)
+	subscriptionService := subscription.NewService(subscriptionRepo, cfg)
 	projectService := project.NewService(projectRepo, userRepo, hub, subscriptionService)
 
 	authHandler := auth.NewHandler(authService)
@@ -55,7 +56,12 @@ func RegisterRoutes(router *gin.Engine, db *sql.DB, hub *collaboration.Hub) {
 		subscriptionRoutes.Use(middleware.AuthMiddleware())
 		{
 			subscriptionRoutes.GET("/", subscriptionHandler.GetSubscription)
+			subscriptionRoutes.POST("/checkout", subscriptionHandler.CreateCheckout)
+			subscriptionRoutes.POST("/verify", subscriptionHandler.VerifyPayment)
+			subscriptionRoutes.POST("/cancel", subscriptionHandler.CancelCheckout)
+			subscriptionRoutes.GET("/transactions", subscriptionHandler.GetTransactions)
 		}
+		api.POST("/subscription/webhook", subscriptionHandler.Webhook)
 
 		// USER ROUTES
 		userRoutes := api.Group("/user")
