@@ -5,6 +5,9 @@
 tmp/
 bin/
 
+api
+main
+
 # OS
 .DS_Store
 

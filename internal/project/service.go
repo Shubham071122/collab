@@ -200,7 +200,8 @@ func (s *Service) ShareProject(projectID string, req ShareProjectRequest, ownerI
 		return errors.New("Project not found")
 	}
 
-	targetUser, err := s.userRepo.GetUserByEmail(req.Email)
+	emailStr := strings.ToLower(strings.TrimSpace(req.Email))
+	targetUser, err := s.userRepo.GetUserByEmail(emailStr)
 
 	if err != nil {
 		return errors.New("User not found")

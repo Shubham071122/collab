@@ -178,6 +178,31 @@ func (r *Repository) GetTransactionBySubscriptionID(subID string) (*Subscription
 	return &tx, nil
 }
 
+func (r *Repository) GetTransactionByPaymentID(paymentID string) (*SubscriptionTransaction, error) {
+	query := `
+		SELECT id, user_id, subscription_id, payment_id, amount, status, billing_reason, created_at
+		FROM subscription_transactions
+		WHERE payment_id = $1
+	`
+	var tx SubscriptionTransaction
+	err := r.db.QueryRow(query, paymentID).Scan(
+		&tx.ID,
+		&tx.UserID,
+		&tx.SubscriptionID,
+		&tx.PaymentID,
+		&tx.Amount,
+		&tx.Status,
+		&tx.BillingReason,
+		&tx.CreatedAt,
+	)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	} else if err != nil {
+		return nil, err
+	}
+	return &tx, nil
+}
+
 func (r *Repository) UpdateTransaction(id string, paymentID *string, status string, billingReason *string) error {
 	query := `
 		UPDATE subscription_transactions

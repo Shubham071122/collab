@@ -196,6 +196,16 @@ func (s *Service) VerifySubscriptionPayment(userID string, subscriptionID string
 		return errors.New("invalid payment signature")
 	}
 
+	existingTx, err := s.subRepo.GetTransactionByPaymentID(paymentID)
+	if err != nil {
+		return err
+	}
+	if existingTx != nil {
+		if existingTx.Status == "captured" {
+			return nil
+		}
+	}
+
 	tx, err := s.subRepo.GetTransactionBySubscriptionID(subscriptionID)
 	if err != nil {
 		return err
@@ -292,14 +302,22 @@ func (s *Service) ProcessWebhook(payload []byte, headerSignature string) error {
 			return err
 		}
 
+		payID := wp.Payload.Payment.Entity.ID
+		amount := wp.Payload.Payment.Entity.Amount
+		reason := wp.Event
+
+		existingTx, err := s.subRepo.GetTransactionByPaymentID(payID)
+		if err != nil {
+			fmt.Printf("failed to lookup existing transaction by payment ID in webhook: %v\n", err)
+		}
+		if existingTx != nil {
+			return nil
+		}
+
 		tx, err := s.subRepo.GetTransactionBySubscriptionID(subID)
 		if err != nil {
 			fmt.Printf("failed to lookup transaction in webhook: %v\n", err)
 		}
-
-		payID := wp.Payload.Payment.Entity.ID
-		amount := wp.Payload.Payment.Entity.Amount
-		reason := wp.Event
 
 		if tx != nil && tx.Status == "created" {
 			err = s.subRepo.UpdateTransaction(tx.ID, &payID, "captured", &reason)
@@ -323,14 +341,22 @@ func (s *Service) ProcessWebhook(payload []byte, headerSignature string) error {
 		}
 
 	case "payment.failed":
+		payID := wp.Payload.Payment.Entity.ID
+		amount := wp.Payload.Payment.Entity.Amount
+		reason := wp.Event
+
+		existingTx, err := s.subRepo.GetTransactionByPaymentID(payID)
+		if err != nil {
+			fmt.Printf("failed to lookup existing transaction by payment ID in webhook: %v\n", err)
+		}
+		if existingTx != nil {
+			return nil
+		}
+
 		tx, err := s.subRepo.GetTransactionBySubscriptionID(subID)
 		if err != nil {
 			fmt.Printf("failed to lookup transaction in webhook: %v\n", err)
 		}
-
-		payID := wp.Payload.Payment.Entity.ID
-		amount := wp.Payload.Payment.Entity.Amount
-		reason := wp.Event
 
 		if tx != nil && tx.Status == "created" {
 			err = s.subRepo.UpdateTransaction(tx.ID, &payID, "failed", &reason)
