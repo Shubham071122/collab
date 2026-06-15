@@ -41,7 +41,7 @@ func (r *Repository) GetUserByEmail(email string) (*User, error) {
 	err := r.db.QueryRow(`
 		SELECT id, name, email, is_verified, verification_code, verification_expires, created_at, updated_at 
 		FROM users 
-		WHERE email = $1
+		WHERE lower(email) = lower($1)
 	`, email).Scan(
 		&user.ID,
 		&user.Name,
