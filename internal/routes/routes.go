@@ -25,7 +25,7 @@ func RegisterRoutes(router *gin.Engine, db *sql.DB, hub *collaboration.Hub, cfg 
 
 	authService := auth.NewService(authRepo, subscriptionRepo)
 	userService := user.NewService(userRepo)
-	subscriptionService := subscription.NewService(subscriptionRepo, cfg)
+	subscriptionService := subscription.NewService(subscriptionRepo, userRepo, cfg)
 	projectService := project.NewService(projectRepo, userRepo, hub, subscriptionService)
 
 	authHandler := auth.NewHandler(authService)

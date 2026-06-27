@@ -29,6 +29,8 @@ func main() {
 	}
 	router.Use(middleware.CORSMiddleware(allowedOrigin))
 
+	router.Static("/public", "./public")
+
 	routes.RegisterRoutes(router, db, hub, cfg)
 
 	if err := router.Run(":" + cfg.Port); err != nil {

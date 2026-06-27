@@ -13,17 +13,22 @@ import (
 	"time"
 
 	"github.com/shubham071122/collab/internal/config"
+	"github.com/shubham071122/collab/internal/user"
+	"github.com/shubham071122/collab/pkg/email"
+	"github.com/shubham071122/collab/templates/emails"
 )
 
 type Service struct {
-	subRepo *Repository
-	cfg     *config.Config
+	subRepo  *Repository
+	userRepo *user.Repository
+	cfg      *config.Config
 }
 
-func NewService(subRepo *Repository, cfg *config.Config) *Service {
+func NewService(subRepo *Repository, userRepo *user.Repository, cfg *config.Config) *Service {
 	return &Service{
-		subRepo: subRepo,
-		cfg:     cfg,
+		subRepo:  subRepo,
+		userRepo: userRepo,
+		cfg:      cfg,
 	}
 }
 
@@ -240,6 +245,8 @@ func (s *Service) VerifySubscriptionPayment(userID string, subscriptionID string
 		fmt.Printf("failed to update transaction: %v\n", err)
 	}
 
+	go s.sendSubscriptionConfirmationEmail(userID, tier, paymentID, tx.Amount, &nextMonth, subscriptionID)
+
 	return nil
 }
 
@@ -328,6 +335,8 @@ func (s *Service) ProcessWebhook(payload []byte, headerSignature string) error {
 			fmt.Printf("failed to log webhook transaction: %v\n", err)
 		}
 
+		go s.sendSubscriptionConfirmationEmail(sub.UserID, tier, payID, amount, currentPeriodEnd, subID)
+
 	case "subscription.cancelled":
 		err = s.subRepo.UpdateSubscription(sub.UserID, sub.Tier, StatusCanceled, ProviderRazorpay, subID, sub.CurrentPeriodEnd)
 		if err != nil {
@@ -395,5 +404,58 @@ func (s *Service) CancelSubscriptionCheckout(userID string, subscriptionID strin
 
 func (s *Service) GetTransactionsByUserID(userID string) ([]SubscriptionTransaction, error) {
 	return s.subRepo.GetTransactionsByUserID(userID)
+}
+
+func (s *Service) sendSubscriptionConfirmationEmail(userID string, tier SubscriptionTier, paymentID string, amountInt int, renewalDate *time.Time, subscriptionID string) {
+	u, err := s.userRepo.GetUserByID(userID)
+	if err != nil {
+		fmt.Printf("failed to fetch user %s for email confirmation: %v\n", userID, err)
+		return
+	}
+
+	plan, exists := Plans[tier]
+	if !exists {
+		fmt.Printf("plan not found for tier %s\n", tier)
+		return
+	}
+
+	priceStr := fmt.Sprintf("₹%.2f", float64(amountInt)/100.0)
+	renewalStr := "N/A"
+	if renewalDate != nil {
+		renewalStr = renewalDate.Format("Jan 02, 2006")
+	}
+
+	logoBaseURL := s.cfg.BackendURL
+	if logoBaseURL == "" {
+		logoBaseURL = "http://localhost:8080"
+	}
+	logoURL := fmt.Sprintf("%s/public/logo.png?v=%d", logoBaseURL, time.Now().Unix())
+
+	ctaURL := s.cfg.AllowedOrigin
+	if ctaURL == "" {
+		ctaURL = "https://collab.plynk.in"
+	}
+
+	htmlContent, err := emails.RenderSubscriptionConfirmation(emails.SubscriptionEmailData{
+		Name:           u.Name,
+		PlanName:       plan.Name,
+		Price:          priceStr,
+		SubscriptionID: subscriptionID,
+		RenewalDate:    renewalStr,
+		Features:        plan.Features,
+		LogoURL:        logoURL,
+		CTAURL:         ctaURL,
+		Year:           time.Now().Year(),
+	})
+	if err != nil {
+		fmt.Printf("failed to render subscription confirmation template: %v\n", err)
+		return
+	}
+
+	subject := fmt.Sprintf("Subscription Confirmed: Welcome to Collab %s!", plan.Name)
+	err = email.SendEmail(u.Email, subject, htmlContent)
+	if err != nil {
+		fmt.Printf("failed to send subscription confirmation email: %v\n", err)
+	}
 }
 

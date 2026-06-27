@@ -18,17 +18,6 @@ type SendEmailRequest struct {
 }
 
 func SendVerificationEmail(toEmail string, name string, otp string) error {
-	cfg := config.LoadConfig()
-	apiKey := cfg.ResendAPIKey
-	fromEmail := cfg.ResendFromEmail
-
-	if apiKey == "" {
-		return fmt.Errorf("RESEND_API_KEY is not configured")
-	}
-	if fromEmail == "" {
-		fromEmail = "no-reply@plynk.in"
-	}
-
 	htmlContent := fmt.Sprintf(`<!DOCTYPE html>
 <html>
 <head>
@@ -88,10 +77,25 @@ func SendVerificationEmail(toEmail string, name string, otp string) error {
 </body>
 </html>`, name, otp, time.Now().Year())
 
+	return SendEmail(toEmail, "Your Collab verification code", htmlContent)
+}
+
+func SendEmail(toEmail string, subject string, htmlContent string) error {
+	cfg := config.LoadConfig()
+	apiKey := cfg.ResendAPIKey
+	fromEmail := cfg.ResendFromEmail
+
+	if apiKey == "" {
+		return fmt.Errorf("RESEND_API_KEY is not configured")
+	}
+	if fromEmail == "" {
+		fromEmail = "no-reply@plynk.in"
+	}
+
 	reqBody := SendEmailRequest{
 		From:    fmt.Sprintf("Collab <%s>", fromEmail),
 		To:      []string{toEmail},
-		Subject: "Your Collab verification code",
+		Subject: subject,
 		HTML:    htmlContent,
 	}
 

@@ -8,6 +8,7 @@ import (
 
 type Config struct {
 	Port                  string
+	BackendURL            string
 	JWTSecret             string
 	DatabaseURL           string
 	ResendAPIKey          string
@@ -26,6 +27,7 @@ func LoadConfig() *Config {
 
 	return &Config{
 		Port:                  os.Getenv("PORT"),
+		BackendURL:            os.Getenv("BACKEND_URL"),
 		JWTSecret:             os.Getenv("JWT_SECRET"),
 		DatabaseURL:           os.Getenv("DATABASE_URL"),
 		ResendAPIKey:          os.Getenv("RESEND_API_KEY"),
