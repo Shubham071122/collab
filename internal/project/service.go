@@ -152,6 +152,12 @@ func (s *Service) UpdateProject(projectID string, userID string, req UpdateProje
 	if req.Canvas != nil {
 		existingProject.Canvas = *req.Canvas
 	}
+	if req.IsArchived != nil {
+		if !isOwner {
+			return nil, errors.New("Unauthorized: only the owner can archive or unarchive the project")
+		}
+		existingProject.IsArchived = *req.IsArchived
+	}
 
 	updatedProject, err := s.projectRepo.UpdateProject(existingProject)
 	if err != nil {
@@ -321,12 +327,12 @@ func (s *Service) UpdateCollaboratorPermission(projectID string, userID string, 
 	return nil
 }
 
-func (s *Service) RemoveCollaborator(projectID string, userID string, ownerID string) error {
+func (s *Service) RemoveCollaborator(projectID string, userID string, callerID string) error {
 	if projectID == "" {
 		return errors.New("Project ID is required")
 	}
 
-	if ownerID == "" {
+	if callerID == "" {
 		return errors.New("User ID is required")
 	}
 
@@ -336,13 +342,13 @@ func (s *Service) RemoveCollaborator(projectID string, userID string, ownerID st
 		return errors.New("Project not found")
 	}
 
-	isOwner, err := s.projectRepo.IsProjectOwner(existingProject.ID, ownerID)
+	isOwner, err := s.projectRepo.IsProjectOwner(existingProject.ID, callerID)
 	if err != nil {
 		return errors.New("Failed to check project ownership")
 	}
 
-	if !isOwner {
-		return errors.New("Unauthorized: only project owner can remove collaborators")
+	if !isOwner && callerID != userID {
+		return errors.New("Unauthorized: only the project owner or the collaborator themselves can remove this collaboration")
 	}
 
 	err = s.projectRepo.RemoveCollaborator(existingProject.ID, userID)

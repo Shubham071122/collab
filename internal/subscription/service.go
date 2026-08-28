@@ -16,19 +16,26 @@ import (
 	"github.com/shubham071122/collab/internal/user"
 	"github.com/shubham071122/collab/pkg/email"
 	"github.com/shubham071122/collab/templates/emails"
+
 )
+
+type SubscriptionListener interface {
+	UpdateUserSubscription(userID string)
+}
 
 type Service struct {
 	subRepo  *Repository
 	userRepo *user.Repository
 	cfg      *config.Config
+	listener SubscriptionListener
 }
 
-func NewService(subRepo *Repository, userRepo *user.Repository, cfg *config.Config) *Service {
+func NewService(subRepo *Repository, userRepo *user.Repository, cfg *config.Config, listener SubscriptionListener) *Service {
 	return &Service{
 		subRepo:  subRepo,
 		userRepo: userRepo,
 		cfg:      cfg,
+		listener: listener,
 	}
 }
 
@@ -52,6 +59,7 @@ type RazorpayWebhookPayload struct {
 		Subscription struct {
 			Entity struct {
 				ID         string            `json:"id"`
+				PlanID     string            `json:"plan_id"`
 				Status     string            `json:"status"`
 				CurrentEnd *int64            `json:"current_end"`
 				Notes      map[string]string `json:"notes"`
@@ -237,6 +245,7 @@ func (s *Service) VerifySubscriptionPayment(userID string, subscriptionID string
 	if err != nil {
 		return err
 	}
+	go s.listener.UpdateUserSubscription(userID)
 
 	capturedStatus := "captured"
 	reason := "subscription.created"
@@ -308,6 +317,7 @@ func (s *Service) ProcessWebhook(payload []byte, headerSignature string) error {
 		if err != nil {
 			return err
 		}
+		go s.listener.UpdateUserSubscription(sub.UserID)
 
 		payID := wp.Payload.Payment.Entity.ID
 		amount := wp.Payload.Payment.Entity.Amount
@@ -342,12 +352,35 @@ func (s *Service) ProcessWebhook(payload []byte, headerSignature string) error {
 		if err != nil {
 			return err
 		}
+		go s.listener.UpdateUserSubscription(sub.UserID)
 
 	case "subscription.halted":
 		err = s.subRepo.UpdateSubscription(sub.UserID, sub.Tier, StatusPastDue, ProviderRazorpay, subID, sub.CurrentPeriodEnd)
 		if err != nil {
 			return err
 		}
+		go s.listener.UpdateUserSubscription(sub.UserID)
+
+	case "subscription.updated":
+		planID := wp.Payload.Subscription.Entity.PlanID
+		tier := sub.Tier
+		if planID == s.cfg.RazorpayGoldPlanID {
+			tier = TierGold
+		} else if planID == s.cfg.RazorpaySilverPlanID {
+			tier = TierSilver
+		}
+
+		var currentPeriodEnd *time.Time
+		if wp.Payload.Subscription.Entity.CurrentEnd != nil {
+			t := time.Unix(*wp.Payload.Subscription.Entity.CurrentEnd, 0)
+			currentPeriodEnd = &t
+		}
+
+		err = s.subRepo.UpdateSubscription(sub.UserID, tier, StatusActive, ProviderRazorpay, subID, currentPeriodEnd)
+		if err != nil {
+			return err
+		}
+		go s.listener.UpdateUserSubscription(sub.UserID)
 
 	case "payment.failed":
 		payID := wp.Payload.Payment.Entity.ID

@@ -10,6 +10,7 @@ type UpdateProjectRequest struct {
 	Name        *string `json:"name"`
 	Description *string `json:"description"`
 	Canvas      *string `json:"canvas"`
+	IsArchived  *bool   `json:"is_archived"`
 }
 
 type ShareProjectRequest struct {

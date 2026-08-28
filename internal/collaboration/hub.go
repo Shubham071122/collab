@@ -10,8 +10,9 @@ import (
 )
 
 type CanvasSnapshot struct {
-	Store  map[string]interface{} `json:"store"`
-	Schema interface{}            `json:"schema"`
+	Store    map[string]interface{} `json:"store"`
+	Schema   interface{}            `json:"schema"`
+	Revision int                    `json:"revision"`
 }
 
 type permissionUpdateTask struct {
@@ -30,6 +31,7 @@ type Hub struct {
 	saveTimers       map[string]*time.Timer
 	saveQueue        chan string
 	permissionUpdate chan permissionUpdateTask
+	subscriptionUpdate chan string
 }
 
 func NewHub(db *sql.DB) *Hub {
@@ -43,6 +45,7 @@ func NewHub(db *sql.DB) *Hub {
 		saveTimers:       make(map[string]*time.Timer),
 		saveQueue:        make(chan string, 100),
 		permissionUpdate: make(chan permissionUpdateTask, 100),
+		subscriptionUpdate: make(chan string, 100),
 	}
 }
 
@@ -65,8 +68,10 @@ func (h *Hub) Run() {
 
 		case client := <-h.unregister:
 			if clients, exists := h.rooms[client.ProjectID]; exists {
-				delete(clients, client)
-				close(client.Send)
+				if _, active := clients[client]; active {
+					delete(clients, client)
+					close(client.Send)
+				}
 
 				if len(clients) == 0 {
 					delete(h.rooms, client.ProjectID)
@@ -83,22 +88,33 @@ func (h *Hub) Run() {
 			}
 
 		case message := <-h.broadcast:
-			if clients, exists := h.rooms[message.ProjectID]; exists {
-				marshaledMsg := mustMarshal(message)
-				for client := range clients {
-					select {
-					case client.Send <- marshaledMsg:
-					default:
-						close(client.Send)
-						delete(clients, client)
-					}
-				}
-			}
-
 			if message.Type == "canvas_change" {
 				projectId := message.ProjectID
 				if snapshot, exists := h.roomsCanvas[projectId]; exists && snapshot != nil {
+					if message.BaseRevision < snapshot.Revision {
+						snapshotBytes, _ := json.Marshal(snapshot)
+						conflictMsg := Message{
+							Type:      "canvas_conflict",
+							ProjectID: projectId,
+							UserID:    message.UserID,
+							Payload:   snapshotBytes,
+						}
+						if clients, exists := h.rooms[projectId]; exists {
+							for client := range clients {
+								if client.UserID == message.UserID {
+									select {
+									case client.Send <- mustMarshal(conflictMsg):
+									default:
+									}
+								}
+							}
+						}
+						continue
+					}
+
 					h.applyCanvasDiff(snapshot, message.Payload)
+					snapshot.Revision++
+					message.BaseRevision = snapshot.Revision
 
 					if timer, exists := h.saveTimers[projectId]; exists {
 						timer.Stop()
@@ -106,6 +122,22 @@ func (h *Hub) Run() {
 					h.saveTimers[projectId] = time.AfterFunc(10*time.Second, func() {
 						h.saveQueue <- projectId
 					})
+				}
+			}
+
+			if clients, exists := h.rooms[message.ProjectID]; exists {
+				marshaledMsg := mustMarshal(message)
+				for client := range clients {
+					select {
+					case client.Send <- marshaledMsg:
+					default:
+						// Send client to unregister channel so it is safely cleaned up in the main thread
+						select {
+						case h.unregister <- client:
+						default:
+							// If unregister queue is full, do not block the broadcast loop
+						}
+					}
 				}
 			}
 
@@ -149,6 +181,42 @@ func (h *Hub) Run() {
 				}
 			} else {
 				log.Printf("Room %s not found in active rooms", task.ProjectID)
+			}
+
+		case userID := <-h.subscriptionUpdate:
+			log.Printf("Hub subscriptionUpdate received for userID=%s", userID)
+			rows, err := h.db.Query(`SELECT id FROM projects WHERE user_id = $1`, userID)
+			if err != nil {
+				log.Printf("Error querying user projects in subscriptionUpdate: %v", err)
+				continue
+			}
+			defer rows.Close()
+
+			for rows.Next() {
+				var projectID string
+				if err := rows.Scan(&projectID); err != nil {
+					continue
+				}
+
+				if clients, exists := h.rooms[projectID]; exists {
+					for client := range clients {
+						newPermission, err := getProjectPermission(h.db, projectID, client.UserID)
+						if err != nil {
+							log.Printf("Error re-evaluating permission for project %s user %s: %v", projectID, client.UserID, err)
+							continue
+						}
+						if client.Permission != newPermission {
+							client.Permission = newPermission
+							msg := Message{
+								Type:      "permission_changed",
+								ProjectID: projectID,
+								UserID:    client.UserID,
+								Payload:   json.RawMessage(`{"permission":"` + newPermission + `"}`),
+							}
+							client.Send <- mustMarshal(msg)
+						}
+					}
+				}
 			}
 		}
 	}
@@ -234,5 +302,12 @@ func (h *Hub) UpdateUserPermission(projectID string, userID string, permission s
 		ProjectID:  projectID,
 		UserID:     userID,
 		Permission: permission,
+	}
+}
+
+func (h *Hub) UpdateUserSubscription(userID string) {
+	select {
+	case h.subscriptionUpdate <- userID:
+	default:
 	}
 }

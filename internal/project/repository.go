@@ -29,6 +29,7 @@ func (r *Repository) GetProjectByID(id string) (*Project, error) {
 			p.canvas, 
 			p.created_at, 
 			p.updated_at,
+			p.is_archived,
 			COALESCE(
 				(
 					SELECT 
@@ -55,6 +56,7 @@ func (r *Repository) GetProjectByID(id string) (*Project, error) {
 		&project.Canvas,
 		&project.CreatedAt,
 		&project.UpdatedAt,
+		&project.IsArchived,
 		&project.IsLocked,
 	)
 
@@ -76,7 +78,7 @@ func (r *Repository) CreateProject(name string, description string, userId strin
 			user_id
 		)
 		VALUES ($1, $2, $3, $4)
-		RETURNING id, name, description, canvas, created_at, updated_at
+		RETURNING id, name, description, canvas, is_archived, created_at, updated_at
 	`
 
 	err := r.db.QueryRow(
@@ -90,6 +92,7 @@ func (r *Repository) CreateProject(name string, description string, userId strin
 		&project.Name,
 		&project.Description,
 		&project.Canvas,
+		&project.IsArchived,
 		&project.CreatedAt,
 		&project.UpdatedAt,
 	)
@@ -105,8 +108,8 @@ func (r *Repository) UpdateProject(project *Project) (*Project, error) {
 
 	query := `
 		UPDATE projects
-		SET name = $1, description = $2, canvas = CASE WHEN $3 = '' THEN canvas ELSE $3::jsonb END, updated_at = NOW()
-		WHERE id = $4
+		SET name = $1, description = $2, canvas = CASE WHEN $3 = '' THEN canvas ELSE $3::jsonb END, is_archived = $4, updated_at = NOW()
+		WHERE id = $5
 	`
 
 	_, err := r.db.Exec(
@@ -114,6 +117,7 @@ func (r *Repository) UpdateProject(project *Project) (*Project, error) {
 		project.Name,
 		project.Description,
 		project.Canvas,
+		project.IsArchived,
 		project.ID,
 	)
 
@@ -323,6 +327,7 @@ func (r *Repository) GetProjectsByUserID(userID string) ([]Project, error) {
 			p.canvas, 
 			p.created_at, 
 			p.updated_at,
+			p.is_archived,
 			COALESCE(
 				(
 					SELECT 
@@ -360,6 +365,7 @@ func (r *Repository) GetProjectsByUserID(userID string) ([]Project, error) {
 			&project.Canvas,
 			&project.CreatedAt,
 			&project.UpdatedAt,
+			&project.IsArchived,
 			&project.IsLocked,
 		)
 		if err != nil {
